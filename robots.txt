@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://legacymoving.com.br/sitemap.xml
