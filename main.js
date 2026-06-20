@@ -96,7 +96,7 @@
 // ─── ERP Legacy Moving — Integração Site→Sistema ───────────────
 // Quando o backend estiver online, substitua LEGACY_API pela URL real.
 (function() {
-  var LEGACY_API = 'https://SEU-BACKEND.onrender.com';
+  var LEGACY_API = 'https://legacy-moving-api.onrender.com';
   var LEGACY_TOKEN = 'legacy-site-2026-token';
 
   async function enviarLead(payload) {
