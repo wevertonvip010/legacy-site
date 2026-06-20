@@ -92,3 +92,30 @@
     });
   }
 })();
+
+// ─── ERP Legacy Moving — Integração Site→Sistema ───────────────
+// Quando o backend estiver online, substitua LEGACY_API pela URL real.
+(function() {
+  var LEGACY_API = 'https://SEU-BACKEND.onrender.com';
+  var LEGACY_TOKEN = 'legacy-site-2026-token';
+
+  async function enviarLead(payload) {
+    if (!LEGACY_API || LEGACY_API.indexOf('SEU-BACKEND') !== -1) return;
+    try {
+      await fetch(LEGACY_API + '/api/leads/site', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Site-Token': LEGACY_TOKEN
+        },
+        body: JSON.stringify(payload)
+      });
+    } catch(e) {
+      console.warn('[Legacy ERP] offline:', e.message);
+    }
+  }
+
+  window.addEventListener('legacy:lead', function(e) {
+    enviarLead(e.detail);
+  });
+})();
