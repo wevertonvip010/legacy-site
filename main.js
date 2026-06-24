@@ -1,121 +1,210 @@
-// LEGACY MOVING — Interações v1.2
-(function() {
+// LEGACY MOVING — Interações v1.3
+// Integração Site → ERP (Legacy Moving System)
+(function () {
   'use strict';
 
-  // Hero carrossel — fade automático entre os serviços
-  const slides = document.querySelectorAll('.hero__slide');
-  const indicators = document.querySelectorAll('.hero__indicator');
+  // ─── Configuração do ERP ──────────────────────────────────────────────────
+  // Altere LEGACY_API para a URL do backend em produção.
+  // Ex: 'https://legacy-erp.fly.dev' ou 'https://legacy-moving-api.onrender.com'
+  var LEGACY_CONFIG = window.LEGACY_CONFIG || {};
+  var LEGACY_API   = LEGACY_CONFIG.api   || 'https://legacy-moving-api.onrender.com';
+  var LEGACY_TOKEN = LEGACY_CONFIG.token || 'legacy-site-2026-token';
+
+  // ─── Hero carrossel — fade automático ────────────────────────────────────
+  var slides     = document.querySelectorAll('.hero__slide');
+  var indicators = document.querySelectorAll('.hero__indicator');
   if (slides.length > 1) {
-    let current = 0;
-    let timer = null;
-    const goTo = (idx) => {
+    var current = 0;
+    var timer   = null;
+    var goTo = function (idx) {
       slides[current].classList.remove('active');
-      indicators[current]?.classList.remove('active');
+      if (indicators[current]) indicators[current].classList.remove('active');
       current = idx;
       slides[current].classList.add('active');
-      indicators[current]?.classList.add('active');
+      if (indicators[current]) indicators[current].classList.add('active');
     };
-    const next = () => goTo((current + 1) % slides.length);
-    const startAuto = () => { timer = setInterval(next, 5500); };
-    const stopAuto = () => { clearInterval(timer); };
-    indicators.forEach((btn, idx) => {
-      btn.addEventListener('click', () => {
-        stopAuto();
-        goTo(idx);
-        startAuto();
-      });
+    var next       = function () { goTo((current + 1) % slides.length); };
+    var startAuto  = function () { timer = setInterval(next, 5500); };
+    var stopAuto   = function () { clearInterval(timer); };
+    indicators.forEach(function (btn, idx) {
+      btn.addEventListener('click', function () { stopAuto(); goTo(idx); startAuto(); });
     });
     startAuto();
   }
 
-  // Menu mobile toggle
-  const menuToggle = document.querySelector('.menu-toggle');
-  const siteNav = document.querySelector('.site-nav');
+  // ─── Menu mobile toggle ───────────────────────────────────────────────────
+  var menuToggle = document.querySelector('.menu-toggle');
+  var siteNav    = document.querySelector('.site-nav');
   if (menuToggle && siteNav) {
-    menuToggle.addEventListener('click', () => {
+    menuToggle.addEventListener('click', function () {
       siteNav.classList.toggle('active');
     });
   }
 
-  // Reveal on scroll
-  const revealElements = document.querySelectorAll('.reveal');
-  if (revealElements.length && 'IntersectionObserver' in window) {
-    const observer = new IntersectionObserver((entries) => {
-      entries.forEach(entry => {
+  // ─── Reveal on scroll ─────────────────────────────────────────────────────
+  var revealEls = document.querySelectorAll('.reveal');
+  if (revealEls.length && 'IntersectionObserver' in window) {
+    var obs = new IntersectionObserver(function (entries) {
+      entries.forEach(function (entry) {
         if (entry.isIntersecting) {
           entry.target.classList.add('visible');
-          observer.unobserve(entry.target);
+          obs.unobserve(entry.target);
         }
       });
     }, { threshold: 0.12, rootMargin: '0px 0px -40px 0px' });
-    revealElements.forEach(el => observer.observe(el));
+    revealEls.forEach(function (el) { obs.observe(el); });
   } else {
-    revealElements.forEach(el => el.classList.add('visible'));
+    revealEls.forEach(function (el) { el.classList.add('visible'); });
   }
 
-  // Formulário Guia (lead capture)
-  const guideForm = document.querySelector('[data-form="guia"]');
-  if (guideForm) {
-    guideForm.addEventListener('submit', function(e) {
-      const channel = guideForm.querySelector('input[name="canal"]:checked')?.value || 'email';
-      const contact = guideForm.querySelector('[name="contato"]').value;
-      const payload = {
-        source: 'guia-legacy',
-        channel: channel,
-        contact: contact,
-        timestamp: new Date().toISOString()
-      };
-      // Evento global para integração com sistema Legacy
-      window.dispatchEvent(new CustomEvent('legacy:lead', { detail: payload }));
+  // ─── Enviar lead ao ERP (em background, silencioso) ──────────────────────
+  function enviarLeadERP(payload) {
+    if (!LEGACY_API) return;
+    fetch(LEGACY_API + '/api/leads/site', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Site-Token': LEGACY_TOKEN
+      },
+      body: JSON.stringify(payload)
+    }).then(function (res) {
+      if (res.ok) {
+        console.info('[Legacy ERP] Lead registrado com sucesso:', payload.source);
+      } else {
+        console.warn('[Legacy ERP] Resposta inesperada:', res.status);
+      }
+    }).catch(function (e) {
+      console.warn('[Legacy ERP] Backend offline ou URL não configurada:', e.message);
     });
   }
 
-  // Formulário Orçamento — preparação de payload estruturado
-  const orcForm = document.querySelector('[data-form="orcamento"]');
-  if (orcForm) {
-    orcForm.addEventListener('submit', function(e) {
-      const data = new FormData(orcForm);
-      const payload = {
-        source: 'orcamento',
-        servico: data.get('servico'),
-        origem_cep: data.get('origem'),
-        destino_cep: data.get('destino'),
-        data_desejada: data.get('data'),
-        tamanho: data.get('tamanho'),
-        nome: data.get('nome'),
-        telefone: data.get('telefone'),
-        email: data.get('email'),
-        observacoes: data.get('observacoes'),
-        timestamp: new Date().toISOString()
-      };
-      window.dispatchEvent(new CustomEvent('legacy:lead', { detail: payload }));
-    });
-  }
-})();
+  // ─── Feedback visual nos formulários ──────────────────────────────────────
+  function mostrarFeedback(form, tipo, msg) {
+    // Remove feedback anterior
+    var anterior = form.querySelector('.form__feedback');
+    if (anterior) anterior.remove();
 
-// ─── ERP Legacy Moving — Integração Site→Sistema ───────────────
-// Quando o backend estiver online, substitua LEGACY_API pela URL real.
-(function() {
-  var LEGACY_API = 'https://legacy-moving-api.onrender.com';
-  var LEGACY_TOKEN = 'legacy-site-2026-token';
+    var div = document.createElement('div');
+    div.className = 'form__feedback form__feedback--' + tipo;
+    div.setAttribute('role', 'alert');
+    div.style.cssText = [
+      'padding: 14px 20px',
+      'border-radius: 6px',
+      'margin-top: 16px',
+      'font-size: 15px',
+      'font-weight: 500',
+      tipo === 'sucesso'
+        ? 'background:#d4edda;color:#155724;border:1px solid #c3e6cb'
+        : 'background:#f8d7da;color:#721c24;border:1px solid #f5c6cb'
+    ].join(';');
+    div.textContent = msg;
+    form.appendChild(div);
 
-  async function enviarLead(payload) {
-    if (!LEGACY_API || LEGACY_API.indexOf('SEU-BACKEND') !== -1) return;
-    try {
-      await fetch(LEGACY_API + '/api/leads/site', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Site-Token': LEGACY_TOKEN
-        },
-        body: JSON.stringify(payload)
-      });
-    } catch(e) {
-      console.warn('[Legacy ERP] offline:', e.message);
+    if (tipo === 'sucesso') {
+      setTimeout(function () { if (div.parentNode) div.remove(); }, 6000);
     }
   }
 
-  window.addEventListener('legacy:lead', function(e) {
-    enviarLead(e.detail);
-  });
+  function setBotaoEstado(btn, estado) {
+    if (!btn) return;
+    if (estado === 'enviando') {
+      btn.dataset.textoOriginal = btn.textContent;
+      btn.textContent = 'Enviando…';
+      btn.disabled = true;
+      btn.style.opacity = '0.7';
+    } else {
+      btn.textContent = btn.dataset.textoOriginal || 'Enviar';
+      btn.disabled = false;
+      btn.style.opacity = '';
+    }
+  }
+
+  // ─── Formulário Guia (captura de lead) ───────────────────────────────────
+  var guideForm = document.querySelector('[data-form="guia"]');
+  if (guideForm) {
+    guideForm.addEventListener('submit', function (e) {
+      e.preventDefault(); // impede envio nativo / reload da página
+
+      var channelEl = guideForm.querySelector('input[name="canal"]:checked');
+      var contactEl = guideForm.querySelector('[name="contato"]');
+      var channel   = channelEl ? channelEl.value : 'email';
+      var contact   = contactEl ? contactEl.value.trim() : '';
+
+      if (!contact) {
+        mostrarFeedback(guideForm, 'erro', 'Por favor, informe seu e-mail ou WhatsApp.');
+        return;
+      }
+
+      var btn = guideForm.querySelector('[type="submit"]');
+      setBotaoEstado(btn, 'enviando');
+
+      var payload = {
+        source:    'guia-legacy',
+        channel:   channel,
+        contact:   contact,
+        timestamp: new Date().toISOString()
+      };
+
+      // Envia ao ERP
+      enviarLeadERP(payload);
+
+      // Emite evento global (compatibilidade)
+      window.dispatchEvent(new CustomEvent('legacy:lead', { detail: payload }));
+
+      // Feedback ao usuário
+      setBotaoEstado(btn, 'normal');
+      mostrarFeedback(guideForm, 'sucesso',
+        'Recebemos seu contato! Falaremos com você em breve.');
+      guideForm.reset();
+    });
+  }
+
+  // ─── Formulário Orçamento ─────────────────────────────────────────────────
+  var orcForm = document.querySelector('[data-form="orcamento"]');
+  if (orcForm) {
+    orcForm.addEventListener('submit', function (e) {
+      e.preventDefault(); // impede envio nativo / reload da página
+
+      var data = new FormData(orcForm);
+
+      var nome     = (data.get('nome')     || '').trim();
+      var telefone = (data.get('telefone') || '').trim();
+      var email    = (data.get('email')    || '').trim();
+
+      if (!nome || !telefone) {
+        mostrarFeedback(orcForm, 'erro', 'Preencha nome e telefone para continuar.');
+        return;
+      }
+
+      var btn = orcForm.querySelector('[type="submit"]');
+      setBotaoEstado(btn, 'enviando');
+
+      var payload = {
+        source:        'orcamento',
+        nome:          nome,
+        telefone:      telefone,
+        email:         email,
+        servico:       data.get('servico')       || '',
+        origem_cep:    data.get('origem')        || '',
+        destino_cep:   data.get('destino')       || '',
+        data_desejada: data.get('data')          || '',
+        tamanho:       data.get('tamanho')       || '',
+        observacoes:   data.get('observacoes')   || '',
+        timestamp:     new Date().toISOString()
+      };
+
+      // Envia ao ERP
+      enviarLeadERP(payload);
+
+      // Emite evento global (compatibilidade)
+      window.dispatchEvent(new CustomEvent('legacy:lead', { detail: payload }));
+
+      // Feedback ao usuário
+      setBotaoEstado(btn, 'normal');
+      mostrarFeedback(orcForm, 'sucesso',
+        'Orçamento solicitado com sucesso! Retornaremos em até 24 horas úteis.');
+      orcForm.reset();
+    });
+  }
+
 })();
